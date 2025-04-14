@@ -1,0 +1,98 @@
+
+---
+
+### Overview
+
+The paper introduces **VideoStorm**, a system designed to process thousands of live video analytics queries over large clusters. Its goal is to tackle the high resource demands of vision processing by carefully managing the trade-off between resource consumption, output quality, and processing delay (lag). VideoStorm is particularly aimed at scenarios such as smart cities and surveillance where millions of video streams need to be analyzed in real time.
+
+---
+
+### Key Challenges
+
+1. **Resource-Quality Trade-off:**  
+   Video analytics algorithms have many tunable parameters (or “knobs”) such as frame resolution, sampling rate, and internal algorithm parameters. Adjusting these knobs can reduce resource demands but may lower the quality of the analytics result. The configuration space grows exponentially as more knobs are considered.
+
+2. **Diverse Quality and Lag Goals:**  
+   Different queries have different requirements. For example, a car counter needs moderate quality and low lag, while a license plate reader might require high accuracy but can tolerate longer delays in non-critical uses. Balancing these heterogeneous goals is a central challenge.
+
+3. **Scalability in Scheduling:**  
+   Allocating resources optimally among thousands of queries is computationally complex. Traditional cluster managers (like Yarn or Mesos) usually allocate resources based on fairness, neglecting the nuanced trade-offs needed for video queries.
+
+---
+
+### VideoStorm’s Architecture and Design
+
+#### 1. **Offline Profiling – Resource-Quality Profiles**
+
+- **Profiling Process:**  
+  When a new video analytics query is submitted, VideoStorm starts by running the query with a default configuration while simultaneously profiling it offline. This phase explores a large configuration space (all the possible combinations of knobs) but uses a smart, efficient search (greedy local/hill-climbing techniques) to identify only those configurations that lie on the Pareto boundary (i.e., those that provide the best quality for a given resource demand).
+
+- **Outcome:**  
+  The system reduces the evaluation overhead drastically (in one example, reducing CPU time by 3.5× compared to a basic greedy search) and produces a compact set of candidate configurations that span the trade-offs between quality and resource usage.
+
+#### 2. **Online Scheduling and Resource Allocation**
+
+- **Utility Function Formulation:**  
+  Each query is associated with a utility function that combines both achieved quality (measured, for example, via F1 score) and processing lag. This function includes:
+  - A base utility for meeting minimum quality and lag goals.
+  - An increase in utility for higher quality beyond the minimum requirement.
+  - A penalty for exceeding the lag goal.
+  
+  The shape of the utility function can be adjusted per query based on application-specific requirements.
+
+- **Model-Predictive Control (MPC):**  
+  VideoStorm employs MPC to predict future lag over a short time horizon. The scheduler uses these predictions (factoring in the current lag, resource allocation, and query configuration) to decide the best resource allocation strategy that maximizes either the minimum utility (for fairness) or the total utility (for overall performance).
+
+- **Heuristic Allocation:**  
+  Two primary objectives are addressed:
+  - **Maximizing the Sum of Utilities:** Analogous to a knapsack problem where the gain is utility per allocated resource.
+  - **Maximizing the Minimum Utility (Max-Min Fairness):** Ensuring no query falls below its quality/lag requirement by incrementally allocating resources to the worst-performing query.
+
+#### 3. **Query Placement and Adaptive Enhancements**
+
+- **Query Placement:**  
+  Once resource allocations are determined, VideoStorm also decides on the optimal placement of query tasks across machines. Placement is guided by objectives such as achieving high machine utilization, load balancing, and spreading low-lag queries to avoid overloading any single node.
+
+- **Adaptive Corrections:**  
+  Since the actual resource usage may diverge from the offline profiles (which are based on sample video content), VideoStorm continuously monitors resource consumption. It adapts by learning a multiplicative error factor (µ) to correct future predictions, ensuring that the scheduling decisions remain effective even when the initial profile is slightly off.
+
+- **Migration:**  
+  The system supports query migration across machines to adapt to sudden changes in load or resource availability. This migration is performed with minimal overhead (in the order of seconds), ensuring that quality and lag constraints are maintained even if a query moves from one machine to another.
+
+---
+
+### Evaluation and Experimental Results
+
+- **Performance Gains:**  
+  Deploying VideoStorm on an Azure cluster of 101 machines, the authors demonstrated significant improvements over a fair scheduler:
+  - Up to **80% improvement in the quality** of the outputs.
+  - **7× better lag performance,** meaning that even in resource-constrained bursts, the system kept most frames within acceptable lag limits.
+
+- **Scalability:**  
+  The scheduler can make decisions in a few milliseconds to seconds even with thousands of queries, showing that the approach scales comparably to big data cluster schedulers.
+
+- **Robustness:**  
+  Through experiments where intentional errors were introduced into the query profiles, VideoStorm’s adaptive mechanism was shown to correct these discrepancies, maintaining near-optimal performance in terms of quality and lag.
+
+---
+
+### Contributions and Novelty
+
+1. **Integrated Consideration of Quality and Lag:**  
+   VideoStorm is among the first systems to jointly consider the trade-offs between quality (accuracy of analytics) and lag (delay in processing) in a live video analytics context.
+
+2. **Efficient Profiling of Complex Queries:**  
+   The paper presents novel methods to efficiently profile a large configuration space, drastically reducing the number of configurations that need to be considered at runtime.
+
+3. **Adaptive, Predictive Scheduling:**  
+   By employing MPC and adaptive correction mechanisms, VideoStorm can dynamically adjust resource allocations to accommodate variability in video content and query behavior, outperforming traditional fair scheduling.
+
+---
+
+### Conclusion
+
+VideoStorm presents a significant advancement for live video analytics by introducing a system that is both delay-tolerant and approximation-friendly. Through an efficient mix of offline profiling and adaptive, predictive online scheduling, the system maximizes the utility of video analytics queries, ensuring high quality and controlled lag even under variable resource conditions. This work not only improves performance metrics but also paves the way for deploying video analytics at scale in practical, resource-constrained environments.
+
+---
+
+This comprehensive summary covers the key motivations, methods, and findings described in the paper. If you need further details or have specific questions regarding any aspect, feel free to ask. 
